@@ -10,7 +10,6 @@
 import asyncio
 import sys
 from pathlib import Path
-from aiohttp import web
 import os
 
 # 添加项目根目录到 Python 路径
@@ -23,6 +22,14 @@ from src.agents.router_agent import RouterAgent
 from src.agents.live_monitor_agent import LiveMonitorAgent
 from src.agents.briefing_agent import BriefingAgent
 from src.agents.data_source_agent import DataSourceAgent
+
+# 动态导入aiohttp（处理云端部署问题）
+try:
+    from aiohttp import web
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    logger.warning("aiohttp不可用，健康检查功能将被禁用")
+    AIOHTTP_AVAILABLE = False
 
 
 class YouGameExplorer:
@@ -141,31 +148,38 @@ class YouGameExplorer:
         logger.info("OpenAgents模式启动...")
         logger.info("等待OpenAgents Studio连接...")
         
-        # 创建健康检查服务器
-        app = web.Application()
-        app.router.add_get('/health', self.health_check)
-        
         # 获取配置
         host = os.getenv('OPENAGENTS_HOST', 'localhost')
         port = int(os.getenv('OPENAGENTS_PORT', 8000))
         
-        # 启动HTTP服务器
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, host, port)
-        await site.start()
-        
-        logger.info(f"健康检查服务器启动在 http://{host}:{port}")
-        
-        # 在OpenAgents模式下，Agent会自动处理来自网络的消息
-        # 这里我们只需要保持程序运行
-        try:
-            while True:
-                await asyncio.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("收到中断信号，准备关闭...")
-        finally:
-            await runner.cleanup()
+        if AIOHTTP_AVAILABLE:
+            # 创建健康检查服务器
+            app = web.Application()
+            app.router.add_get('/health', self.health_check)
+            
+            # 启动HTTP服务器
+            runner = web.AppRunner(app)
+            await runner.setup()
+            site = web.TCPSite(runner, host, port)
+            await site.start()
+            
+            logger.info(f"健康检查服务器启动在 http://{host}:{port}")
+            
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except KeyboardInterrupt:
+                logger.info("收到中断信号，准备关闭...")
+            finally:
+                await runner.cleanup()
+        else:
+            # 简化模式，不启动HTTP服务器
+            logger.info(f"简化模式启动在端口 {port}")
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except KeyboardInterrupt:
+                logger.info("收到中断信号，准备关闭...")
 
     async def health_check(self, request):
         """健康检查端点"""
@@ -181,13 +195,19 @@ class YouGameExplorer:
                     "data_source_agent": self.data_source_agent is not None
                 }
             }
-            return web.json_response(status)
+            if AIOHTTP_AVAILABLE:
+                return web.json_response(status)
+            else:
+                return status
         except Exception as e:
             logger.error(f"健康检查失败: {e}")
-            return web.json_response(
-                {"status": "unhealthy", "error": str(e)}, 
-                status=500
-            )
+            if AIOHTTP_AVAILABLE:
+                return web.json_response(
+                    {"status": "unhealthy", "error": str(e)}, 
+                    status=500
+                )
+            else:
+                return {"status": "unhealthy", "error": str(e)}
 
     async def shutdown(self):
         """关闭所有Agent"""

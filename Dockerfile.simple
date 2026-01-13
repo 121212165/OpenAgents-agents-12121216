@@ -1,0 +1,71 @@
+# 小游探 - 简化版Docker镜像 (适用于Zeabur)
+FROM python:3.11-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 设置环境变量
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# 复制并安装Python依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# 复制项目文件
+COPY src/ ./src/
+COPY config/ ./config/
+
+# 创建必要目录
+RUN mkdir -p logs
+
+# 创建简化的启动脚本
+RUN echo '#!/usr/bin/env python3\n\
+import sys\n\
+import os\n\
+from pathlib import Path\n\
+\n\
+# 设置路径\n\
+ROOT_DIR = Path(__file__).parent\n\
+sys.path.insert(0, str(ROOT_DIR))\n\
+os.environ.setdefault("PYTHONPATH", str(ROOT_DIR))\n\
+\n\
+# 设置默认环境变量\n\
+os.environ.setdefault("OPENAGENTS_HOST", "0.0.0.0")\n\
+os.environ.setdefault("OPENAGENTS_PORT", "8000")\n\
+\n\
+if __name__ == "__main__":\n\
+    try:\n\
+        from src.main import main\n\
+        import asyncio\n\
+        \n\
+        # 添加openagents参数\n\
+        if "--openagents" not in sys.argv:\n\
+            sys.argv.append("--openagents")\n\
+        \n\
+        print("🚀 启动小游探...")\n\
+        asyncio.run(main())\n\
+    except Exception as e:\n\
+        print(f"❌ 启动失败: {e}")\n\
+        import traceback\n\
+        traceback.print_exc()\n\
+        sys.exit(1)\n\
+' > /app/run.py && chmod +x /app/run.py
+
+# 暴露端口
+EXPOSE 8000
+
+# 简化的健康检查
+HEALTHCHECK --interval=60s --timeout=30s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=10)" || exit 1
+
+# 启动命令
+CMD ["python", "run.py"]
