@@ -24,48 +24,10 @@ RUN pip install --no-cache-dir --upgrade pip \
 # 复制项目文件
 COPY src/ ./src/
 COPY config/ ./config/
+COPY run.py .
 
 # 创建必要目录
 RUN mkdir -p logs
-
-# 创建简化的启动脚本
-RUN echo '#!/usr/bin/env python3\n\
-import sys\n\
-import os\n\
-from pathlib import Path\n\
-\n\
-# 设置路径\n\
-ROOT_DIR = Path(__file__).parent\n\
-sys.path.insert(0, str(ROOT_DIR))\n\
-os.environ.setdefault("PYTHONPATH", str(ROOT_DIR))\n\
-\n\
-# Zeabur端口处理：如果Zeabur设置了PORT，使用它；否则使用8000\n\
-if os.getenv("PORT"):\n\
-    os.environ["OPENAGENTS_PORT"] = os.getenv("PORT")\n\
-    print(f"[Zeabur] 使用端口: {os.getenv(\"PORT\")}")\n\
-else:\n\
-    os.environ.setdefault("OPENAGENTS_PORT", "8000")\n\
-    print(f"[默认] 使用端口: 8000")\n\
-\n\
-os.environ.setdefault("OPENAGENTS_HOST", "0.0.0.0")\n\
-\n\
-if __name__ == "__main__":\n\
-    try:\n\
-        from src.main import main\n\
-        import asyncio\n\
-        \n\
-        # 添加openagents参数\n\
-        if "--openagents" not in sys.argv:\n\
-            sys.argv.append("--openagents")\n\
-        \n\
-        print("🚀 启动小游探...")\n\
-        asyncio.run(main())\n\
-    except Exception as e:\n\
-        print(f"❌ 启动失败: {e}")\n\
-        import traceback\n\
-        traceback.print_exc()\n\
-        sys.exit(1)\n\
-' > /app/run.py && chmod +x /app/run.py
 
 # 暴露端口
 EXPOSE 8000
