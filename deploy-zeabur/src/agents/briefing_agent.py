@@ -47,18 +47,15 @@ class BriefingAgent(WorkerAgent):
 
     def __init__(self):
         super().__init__(agent_id="briefing-agent")
-
+        
         self.description = "多Agent协作智能简报生成系统"
         self.capabilities = [
             "multi_agent_coordination",
-            "data_aggregation",
+            "data_aggregation", 
             "intelligent_summarization",
             "trend_analysis",
             "personalized_briefing"
         ]
-
-        # 注册到错误恢复管理器
-        register_agent_for_recovery("briefing_agent", self)
 
         # Agent协作配置
         self.collaborating_agents = {}

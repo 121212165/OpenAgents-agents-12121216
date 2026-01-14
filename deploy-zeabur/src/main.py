@@ -17,12 +17,11 @@ ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from loguru import logger
-from src.utils.common import setup_logger, load_env, format_performance_report
+from src.utils.common import setup_logger, load_env
 from src.agents.router_agent import RouterAgent
 from src.agents.live_monitor_agent import LiveMonitorAgent
 from src.agents.briefing_agent import BriefingAgent
 from src.agents.data_source_agent import DataSourceAgent
-from src.utils.error_handler import global_recovery_manager
 
 # 动态导入aiohttp（处理云端部署问题）
 try:
@@ -213,23 +212,7 @@ class YouGameExplorer:
     async def shutdown(self):
         """关闭所有Agent"""
         logger.info("关闭所有Agent...")
-
-        # 输出性能报告
-        logger.info("\n" + "="*60)
-        logger.info("性能监控报告")
-        logger.info("="*60)
-        logger.info(format_performance_report())
-
-        # 输出Agent状态
-        logger.info("\n" + "="*60)
-        logger.info("Agent状态报告")
-        logger.info("="*60)
-        agent_status = global_recovery_manager.get_agent_status()
-        for agent_name, status in agent_status.items():
-            logger.info(f"{agent_name}: errors={status['error_count']}, status={status['status']}")
-
-        logger.info("\n" + "="*60)
-
+        
         try:
             if self.router:
                 await self.router.on_shutdown()
@@ -239,7 +222,7 @@ class YouGameExplorer:
                 await self.live_monitor.on_shutdown()
             if self.data_source_agent:
                 await self.data_source_agent.on_shutdown()
-
+            
             logger.info("所有Agent已关闭")
         except Exception as e:
             logger.error(f"关闭Agent时出错: {e}")

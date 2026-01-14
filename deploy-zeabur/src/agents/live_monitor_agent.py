@@ -11,11 +11,9 @@ from openagents.agents import WorkerAgent
 from src.utils.huya_api import HuyaClient
 from src.utils.common import load_yaml_config
 from src.utils.data_sources import (
-    DataSourceManager, TwitchDataSource, MockDataSource,
+    DataSourceManager, TwitchDataSource, MockDataSource, 
     DataQuery, DataResult
 )
-from src.utils.error_handler import register_agent_for_recovery, handle_agent_error
-from src.utils.common import DetailedLogger
 
 
 class LiveMonitorAgent(WorkerAgent):
@@ -31,7 +29,7 @@ class LiveMonitorAgent(WorkerAgent):
 
     def __init__(self, config_path: str = "config/players.yaml"):
         super().__init__(agent_id="live-monitor-agent")
-
+        
         self.description = "监控游戏主播的直播状态"
 
         # 加载配置
@@ -40,9 +38,6 @@ class LiveMonitorAgent(WorkerAgent):
 
         # 初始化数据源管理器
         self.data_manager = DataSourceManager()
-
-        # 注册到错误恢复管理器
-        register_agent_for_recovery("live_monitor", self)
         
         # 添加模拟数据源（用于演示）
         mock_source = MockDataSource()

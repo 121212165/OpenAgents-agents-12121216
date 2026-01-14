@@ -1,0 +1,94 @@
+# OpenAgents 网络配置文件
+# 小游探 - YouGame Explorer Network
+
+network:
+  name: "小游探"
+  version: "0.1.0"
+  description: "为游戏圈粉丝打造的 AI 吃瓜助手"
+
+  # 安全设置
+  security:
+    enable_auth: false  # 基础版暂不启用认证
+    allowed_origins: ["*"]  # 允许所有来源
+
+  # 传输设置
+  transport:
+    type: "tcp"
+    host: "localhost"
+    port: 8000
+
+  # Mods 配置
+  mods:
+    # LLM Mod - 用于智能问答和内容生成
+    - name: "llm"
+      enabled: true
+      config:
+        provider: "anthropic"  # 或 "openai"
+        model: "claude-3-5-sonnet-20241022"
+        temperature: 0.7
+        max_tokens: 2000
+
+    # HTTP Mod - 用于请求外部 API
+    - name: "http"
+      enabled: true
+      config:
+        timeout: 10
+        max_retries: 3
+
+    # Workspace Mod - 用于数据持久化
+    - name: "workspace"
+      enabled: true
+      config:
+        storage_path: "./workspace"
+        max_size_mb: 100
+
+  # Agent 配置
+  agents:
+    # Router Agent - 路由中枢
+    - id: "router"
+      name: "Router Agent"
+      type: "WorkerAgent"
+      enabled: true
+      config:
+        max_concurrent_tasks: 10
+        timeout: 30
+
+    # LiveMonitor Agent - 直播监控
+    - id: "live_monitor"
+      name: "LiveMonitor Agent"
+      type: "WorkerAgent"
+      enabled: true
+      config:
+        polling_interval: 300  # 5分钟
+        platforms: ["huya"]
+
+    # BriefingAgent - 简报生成
+    - id: "briefing"
+      name: "BriefingAgent"
+      type: "WorkerAgent"
+      enabled: true
+      config:
+        max_summary_length: 500
+
+  # 事件配置
+  events:
+    # 开播事件
+    - name: "streaming_started"
+      enabled: true
+      notify: true
+
+    # 下播事件
+    - name: "streaming_ended"
+      enabled: true
+      notify: false
+
+    # 重要动态
+    - name: "important_update"
+      enabled: true
+      notify: true
+
+  # 日志配置
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+    file: "logs/yougame.log"
+    rotation: "10 MB"

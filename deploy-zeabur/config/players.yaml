@@ -1,0 +1,63 @@
+# 监控的游戏主播列表
+# 小游探 - YouGame Explorer
+
+monitored_players:
+  # 英雄联盟选手
+  - name: "Uzi"
+    english_name: "Uzi"
+    huya_id: "995888"  # 虎牙房间号（示例，需替换）
+    team: "退役"
+    role: "ADC"
+    game: "英雄联盟"
+    priority: "high"  # high/medium/low
+
+  - name: "Faker"
+    english_name: "Faker"
+    huya_id: ""  # 暂无虎牙直播
+    team: "T1"
+    role: "中单"
+    game: "英雄联盟"
+    priority: "high"
+
+  # 主播
+  - name: "大司马"
+    english_name: "Dasima"
+    huya_id: "5666913"  # 需要核实
+    team: "独立主播"
+    role: "娱乐"
+    game: "英雄联盟"
+    priority: "medium"
+
+  # 可以继续添加更多主播
+  # - name: "主播名"
+  #   huya_id: "房间号"
+  #   team: "战队"
+  #   role: "位置"
+  #   game: "游戏"
+  #   priority: "medium"
+
+# 监控配置
+monitoring:
+  # 轮询间隔（秒）
+  polling_interval:
+    high: 60      # 高优先级：1分钟
+    medium: 300   # 中优先级：5分钟
+    low: 900      # 低优先级：15分钟
+
+  # 开播通知
+  notification:
+    enable: true
+    # 最小直播时长（分钟），过滤掉短暂的测试直播
+    min_duration: 5
+    # 通知冷却时间（分钟），避免频繁通知
+    cooldown: 30
+
+# 支持的游戏
+supported_games:
+  - 英雄联盟
+  - 王者荣耀
+  - Dota 2
+  - CS:GO
+  - 绝地求生
+  - 原神
+  - 其他

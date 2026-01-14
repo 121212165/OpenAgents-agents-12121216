@@ -54,11 +54,11 @@ class RouterAgent(WorkerAgent):
 
     def __init__(self):
         super().__init__(agent_id="router-agent")
-
+        
         self.description = "小游探智能路由中枢 - 负责任务分发、Agent协调和结果聚合"
         self.capabilities = [
-            "intent_recognition",
-            "task_routing",
+            "intent_recognition", 
+            "task_routing", 
             "result_aggregation",
             "error_handling",
             "system_monitoring"
@@ -67,9 +67,6 @@ class RouterAgent(WorkerAgent):
         # Agent依赖注入
         self.agents = {}
         self.agent_status = {}
-
-        # 注册到错误恢复管理器
-        register_agent_for_recovery("router", self)
         
         # 智能路由配置
         self.intent_confidence_threshold = 0.7
@@ -90,7 +87,7 @@ class RouterAgent(WorkerAgent):
             "直播查询": ["直播", "开播", "在播", "在线", "live", "streaming"],
             "简报生成": ["简报", "日报", "汇总", "总结", "briefing", "报告", "动态"],
             "数据分析": ["分析", "趋势", "统计", "数据", "热度", "排行"],
-            "系统状态": ["系统状态", "系统", "状态", "健康", "监控", "性能", "health", "status"],
+            "系统状态": ["状态", "健康", "监控", "性能", "统计", "系统状态"],
             "问候": ["你好", "嗨", "hello", "hi", "您好", "早上好", "晚上好"]
         }
 
@@ -208,19 +205,16 @@ class RouterAgent(WorkerAgent):
     async def smart_process(self, user_input: str, context: QueryContext) -> Dict[str, Any]:
         """
         智能处理用户查询 - 核心路由逻辑
-
+        
         Args:
             user_input: 用户输入
             context: 查询上下文
-
+            
         Returns:
             处理结果字典
         """
         start_time = datetime.now()
-        intent = "未知"
-        confidence = 0.0
-        agents_used = ["router"]
-
+        
         try:
             logger.info(f"智能处理查询: {user_input}")
 
@@ -229,53 +223,31 @@ class RouterAgent(WorkerAgent):
             intent = intent_result.get("intent", "未知")
             entities = intent_result.get("entities", {})
             confidence = intent_result.get("confidence", 0.0)
-
+            
             logger.info(f"意图识别 - 意图: {intent}, 置信度: {confidence:.2f}, 实体: {entities}")
 
             # 2. 任务规划和路由
             tasks = await self._plan_tasks(intent, entities, user_input, context)
-
+            
             if not tasks:
-                result = await self._handle_unknown_intent(user_input, context)
-                processing_time = (datetime.now() - start_time).total_seconds()
-                # 记录查询日志
-                DetailedLogger.log_user_query(
-                    query=user_input,
-                    intent=intent,
-                    confidence=confidence,
-                    agents_used=agents_used,
-                    duration=processing_time,
-                    success=False
-                )
-                return result
+                return await self._handle_unknown_intent(user_input, context)
 
             # 3. 执行任务（支持并发）
             task_results = await self._execute_tasks(tasks)
-
+            
             # 4. 结果聚合
             final_result = await self._aggregate_results(task_results, intent, entities)
-            agents_used = final_result.get("agents_used", ["router"])
-
+            
             # 5. 响应优化
             enhanced_response = await self._enhance_response(final_result, context)
-
+            
             processing_time = (datetime.now() - start_time).total_seconds()
-
-            # 记录成功的查询日志
-            DetailedLogger.log_user_query(
-                query=user_input,
-                intent=intent,
-                confidence=confidence,
-                agents_used=agents_used,
-                duration=processing_time,
-                success=True
-            )
-
+            
             return {
                 "success": True,
                 "response": enhanced_response,
                 "data": final_result.get("data"),
-                "agent_used": agents_used[0] if agents_used else "router",
+                "agent_used": final_result.get("agents_used", ["router"])[0] if final_result.get("agents_used") else "router",
                 "processing_time": processing_time,
                 "intent": intent,
                 "confidence": confidence
@@ -284,27 +256,10 @@ class RouterAgent(WorkerAgent):
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             logger.error(f"智能处理失败: {e}")
-
-            # 使用错误处理模块
-            error_msg = await handle_agent_error("router", e, {
-                "user_input": user_input[:100],
-                "intent": intent,
-                "context": "smart_process"
-            })
-
-            # 记录失败的查询日志
-            DetailedLogger.log_user_query(
-                query=user_input,
-                intent=intent,
-                confidence=confidence,
-                agents_used=agents_used,
-                duration=processing_time,
-                success=False
-            )
-
+            
             return {
                 "success": False,
-                "response": error_msg,
+                "response": await self._get_error_response(str(e)),
                 "data": None,
                 "agent_used": "router",
                 "processing_time": processing_time,

@@ -51,20 +51,17 @@ class DataSourceAgent(WorkerAgent):
     
     def __init__(self):
         super().__init__(agent_id="datasource-agent")
-
+        
         self.description = "统一数据源管理和查询服务 - 支持多数据源故障切换"
         self.capabilities = [
             "data_query",
-            "source_management",
+            "source_management", 
             "cache_management",
             "health_monitoring"
         ]
-
+        
         # 初始化数据源管理器
         self.data_manager = DataSourceManager()
-
-        # 注册到错误恢复管理器
-        register_agent_for_recovery("data_source", self)
         
         # 查询统计和监控
         self.query_stats = {
@@ -151,22 +148,22 @@ class DataSourceAgent(WorkerAgent):
             )
 
     # 标准化查询接口 - 供其他Agent调用
-    async def get_live_streams(self, game_name: str = None, user_login: str = None,
+    async def get_live_streams(self, game_name: str = None, user_login: str = None, 
                              first: int = 10, language: str = None) -> QueryResponse:
         """
         获取直播流数据 - 标准接口
-
+        
         Args:
             game_name: 游戏名称
             user_login: 主播登录名（可以是列表）
             first: 返回数量
             language: 语言过滤
-
+            
         Returns:
             QueryResponse对象
         """
         start_time = datetime.now()
-
+        
         try:
             parameters = {"first": first}
             if game_name:
@@ -175,30 +172,19 @@ class DataSourceAgent(WorkerAgent):
                 parameters["user_login"] = user_login
             if language:
                 parameters["language"] = language
-
+            
             query = DataQuery(
                 query_type="streams",
                 parameters=parameters,
                 cache_ttl=300  # 5分钟缓存
             )
-
+            
             result = await self.data_manager.fetch(query)
             processing_time = (datetime.now() - start_time).total_seconds()
-
+            
             # 更新统计
             self._update_stats(result.success, processing_time, result.cached)
-
-            # 记录详细日志
-            DetailedLogger.log_data_source_query(
-                source=result.source,
-                query_type="streams",
-                parameters=parameters,
-                result_count=len(result.data) if result.success and result.data else 0,
-                cached=result.cached,
-                duration=processing_time,
-                error=result.error if not result.success else None
-            )
-
+            
             return QueryResponse(
                 success=result.success,
                 data=result.data,
@@ -207,25 +193,18 @@ class DataSourceAgent(WorkerAgent):
                 processing_time=processing_time,
                 error=result.error
             )
-
+            
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
             self._update_stats(False, processing_time, False)
-
+            
             logger.error(f"获取直播流失败: {e}")
-
-            # 使用错误处理模块
-            error_msg = await handle_agent_error("data_source", e, {
-                "method": "get_live_streams",
-                "parameters": {"game_name": game_name, "user_login": user_login}
-            })
-
             return QueryResponse(
                 success=False,
                 data=None,
                 source="error",
                 processing_time=processing_time,
-                error=error_msg
+                error=str(e)
             )
 
     async def get_user_info(self, user_login: str) -> QueryResponse:
