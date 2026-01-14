@@ -388,6 +388,9 @@ class LLMClient:
         elif any(word in content_lower for word in ["简报", "汇总", "报告", "briefing"]):
             intent = "简报生成"
             confidence = 0.9
+        elif any(word in content_lower for word in ["系统状态", "系统", "状态", "健康", "监控", "health", "status"]):
+            intent = "系统状态"
+            confidence = 0.9
         elif any(word in content_lower for word in ["你好", "嗨", "hello", "hi"]):
             intent = "问候"
             confidence = 0.95
