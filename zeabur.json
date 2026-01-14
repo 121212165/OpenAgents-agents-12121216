@@ -1,19 +1,22 @@
 {
   "name": "yougame-explorer",
-  "type": "python",
-  "build": {
-    "dockerfile": "Dockerfile.simple"
-  },
+  "type": "prebuilt-dockerfile",
+  "dockerfile": "Dockerfile.simple",
   "env": {
     "OPENAGENTS_HOST": "0.0.0.0",
-    "OPENAGENTS_PORT": "8000",
     "PYTHONUNBUFFERED": "1",
     "PYTHONDONTWRITEBYTECODE": "1"
   },
-  "port": 8000,
+  "ports": [
+    {
+      "port": 8000,
+      "protocol": "TCP"
+    }
+  ],
   "healthcheck": {
     "path": "/health",
-    "timeout": 30,
-    "interval": 60
+    "timeout": 60,
+    "interval": 60,
+    "retries": 5
   }
 }

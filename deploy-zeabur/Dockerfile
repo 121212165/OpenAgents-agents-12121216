@@ -39,9 +39,15 @@ ROOT_DIR = Path(__file__).parent\n\
 sys.path.insert(0, str(ROOT_DIR))\n\
 os.environ.setdefault("PYTHONPATH", str(ROOT_DIR))\n\
 \n\
-# 设置默认环境变量\n\
+# Zeabur端口处理：如果Zeabur设置了PORT，使用它；否则使用8000\n\
+if os.getenv("PORT"):\n\
+    os.environ["OPENAGENTS_PORT"] = os.getenv("PORT")\n\
+    print(f"[Zeabur] 使用端口: {os.getenv(\"PORT\")}")\n\
+else:\n\
+    os.environ.setdefault("OPENAGENTS_PORT", "8000")\n\
+    print(f"[默认] 使用端口: 8000")\n\
+\n\
 os.environ.setdefault("OPENAGENTS_HOST", "0.0.0.0")\n\
-os.environ.setdefault("OPENAGENTS_PORT", "8000")\n\
 \n\
 if __name__ == "__main__":\n\
     try:\n\
