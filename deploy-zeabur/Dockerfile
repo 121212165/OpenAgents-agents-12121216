@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
 # 复制并安装Python依赖
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir psutil>=5.9.0 \
     && pip install --no-cache-dir -r requirements.txt
 
 # 复制项目文件
