@@ -17,12 +17,15 @@ ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from loguru import logger
-from src.utils.common import setup_logger, load_env, format_performance_report
+from src.utils.common import setup_logger, load_env
+from src.utils.performance_metrics import get_performance_tracker, format_performance_report
+from src.utils.resource_optimizer import get_resource_optimizer
 from src.agents.router_agent import RouterAgent
 from src.agents.live_monitor_agent import LiveMonitorAgent
 from src.agents.briefing_agent import BriefingAgent
 from src.agents.data_source_agent import DataSourceAgent
 from src.utils.error_handler import global_recovery_manager
+from src.utils.server_config import get_server_config
 
 # 动态导入aiohttp（处理云端部署问题）
 try:
@@ -57,6 +60,11 @@ class YouGameExplorer:
         """初始化所有 Agent"""
         try:
             logger.info("初始化 OpenAgents Agent...")
+
+            # 启动资源优化器监控
+            resource_optimizer = get_resource_optimizer()
+            await resource_optimizer.start_monitoring()
+            logger.info("✅ 资源优化器已启动")
 
             # 1. 创建 DataSource Agent
             self.data_source_agent = DataSourceAgent()
@@ -149,14 +157,15 @@ class YouGameExplorer:
         logger.info("OpenAgents模式启动...")
         logger.info("等待OpenAgents Studio连接...")
         
-        # 获取配置
-        host = os.getenv('OPENAGENTS_HOST', 'localhost')
-        port = int(os.getenv('OPENAGENTS_PORT', 8000))
+        # 获取配置（使用新的配置模块）
+        host, port = get_server_config()
         
         if AIOHTTP_AVAILABLE:
             # 创建健康检查服务器
             app = web.Application()
             app.router.add_get('/health', self.health_check)
+            app.router.add_get('/metrics', self.metrics_endpoint)
+            app.router.add_get('/performance', self.performance_report_endpoint)
             
             # 启动HTTP服务器
             runner = web.AppRunner(app)
@@ -165,6 +174,9 @@ class YouGameExplorer:
             await site.start()
             
             logger.info(f"健康检查服务器启动在 http://{host}:{port}")
+            logger.info(f"  - 健康检查: http://{host}:{port}/health")
+            logger.info(f"  - Prometheus指标: http://{host}:{port}/metrics")
+            logger.info(f"  - 性能报告: http://{host}:{port}/performance")
             
             try:
                 while True:
@@ -209,6 +221,73 @@ class YouGameExplorer:
                 )
             else:
                 return {"status": "unhealthy", "error": str(e)}
+    
+    async def metrics_endpoint(self, request):
+        """Prometheus指标端点"""
+        try:
+            tracker = get_performance_tracker()
+            metrics = tracker.get_prometheus_metrics()
+            
+            if AIOHTTP_AVAILABLE:
+                return web.Response(
+                    body=metrics,
+                    content_type='text/plain; version=0.0.4'
+                )
+            else:
+                return metrics
+        except Exception as e:
+            logger.error(f"获取指标失败: {e}")
+            if AIOHTTP_AVAILABLE:
+                return web.Response(
+                    text=f"Error: {str(e)}",
+                    status=500
+                )
+            else:
+                return b""
+    
+    async def performance_report_endpoint(self, request):
+        """性能报告端点"""
+        try:
+            tracker = get_performance_tracker()
+            
+            # 获取查询参数
+            detailed = request.rel_url.query.get('detailed', 'false').lower() == 'true'
+            format_type = request.rel_url.query.get('format', 'text')
+            
+            if format_type == 'json':
+                # JSON格式
+                summary = tracker.get_performance_summary()
+                stats = tracker.get_stats()
+                slow_queries = tracker.get_slow_queries(limit=10)
+                
+                report_data = {
+                    "summary": summary,
+                    "stats": stats if detailed else {},
+                    "slow_queries": slow_queries
+                }
+                
+                if AIOHTTP_AVAILABLE:
+                    return web.json_response(report_data)
+                else:
+                    return report_data
+            else:
+                # 文本格式
+                report = format_performance_report(detailed=detailed)
+                
+                if AIOHTTP_AVAILABLE:
+                    return web.Response(text=report, content_type='text/plain')
+                else:
+                    return report
+                    
+        except Exception as e:
+            logger.error(f"生成性能报告失败: {e}")
+            if AIOHTTP_AVAILABLE:
+                return web.Response(
+                    text=f"Error: {str(e)}",
+                    status=500
+                )
+            else:
+                return f"Error: {str(e)}"
 
     async def shutdown(self):
         """关闭所有Agent"""
@@ -219,6 +298,15 @@ class YouGameExplorer:
         logger.info("性能监控报告")
         logger.info("="*60)
         logger.info(format_performance_report())
+
+        # 输出资源统计
+        logger.info("\n" + "="*60)
+        logger.info("资源使用报告")
+        logger.info("="*60)
+        resource_optimizer = get_resource_optimizer()
+        resource_stats = resource_optimizer.get_all_stats()
+        import json
+        logger.info(json.dumps(resource_stats, indent=2, ensure_ascii=False))
 
         # 输出Agent状态
         logger.info("\n" + "="*60)
@@ -231,6 +319,9 @@ class YouGameExplorer:
         logger.info("\n" + "="*60)
 
         try:
+            # 停止资源监控
+            resource_optimizer.stop_monitoring()
+            
             if self.router:
                 await self.router.on_shutdown()
             if self.briefing_agent:

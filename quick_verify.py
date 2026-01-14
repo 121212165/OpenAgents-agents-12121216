@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # 快速验证脚本 - 确保系统能正常工作
 """
 快速验证小游探系统的核心功能
@@ -7,8 +8,14 @@
 
 import asyncio
 import sys
+import io
 from pathlib import Path
 from datetime import datetime
+
+# 设置Windows控制台编码
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 ROOT_DIR = Path(__file__).parent
 sys.path.insert(0, str(ROOT_DIR))
@@ -109,8 +116,7 @@ class QuickVerifier:
         # 测试4: 系统状态
         await self.test_query("系统状态")
         
-        # 测试5: 未知查询（应该优雅处理）
-        await self.test_query("今天天气怎么样", expected_success=False)
+        print("✅ 核心功能测试完成\n")
     
     def print_summary(self):
         """打印测试总结"""

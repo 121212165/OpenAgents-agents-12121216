@@ -13,6 +13,10 @@ from openagents.agents import WorkerAgent
 from src.utils.llm_client import llm_client
 from src.utils.error_handler import register_agent_for_recovery, handle_agent_error
 from src.utils.common import monitor_performance, DetailedLogger
+from src.utils.performance_metrics import track_performance, get_performance_tracker
+from src.utils.cache_optimizer import cached_query, get_cache_manager
+from src.utils.studio_helper import get_studio_helper
+from src.utils.response_formatter import get_response_formatter
 
 @dataclass
 class QueryContext:
@@ -71,6 +75,12 @@ class RouterAgent(WorkerAgent):
         # 注册到错误恢复管理器
         register_agent_for_recovery("router", self)
         
+        # Studio助手
+        self.studio_helper = get_studio_helper()
+        
+        # 响应格式化器
+        self.formatter = get_response_formatter()
+        
         # 智能路由配置
         self.intent_confidence_threshold = 0.7
         self.max_concurrent_tasks = 3
@@ -82,7 +92,9 @@ class RouterAgent(WorkerAgent):
             "简报生成": ["briefing_agent", "live_monitor"],
             "数据分析": ["live_monitor", "data_source"],
             "系统状态": ["router"],
-            "问候": ["router"]
+            "问候": ["router"],
+            "帮助": ["router"],
+            "命令": ["router"]
         }
         
         # 降级规则模式
@@ -91,7 +103,9 @@ class RouterAgent(WorkerAgent):
             "简报生成": ["简报", "日报", "汇总", "总结", "briefing", "报告", "动态"],
             "数据分析": ["分析", "趋势", "统计", "数据", "热度", "排行"],
             "系统状态": ["系统状态", "系统", "状态", "健康", "监控", "性能", "health", "status"],
-            "问候": ["你好", "嗨", "hello", "hi", "您好", "早上好", "晚上好"]
+            "问候": ["你好", "嗨", "hello", "hi", "您好", "早上好", "晚上好", "你能做什么", "介绍"],
+            "帮助": ["帮助", "help", "怎么用", "如何使用", "指南"],
+            "命令": ["/help", "/demo", "/status", "/about", "/commands", "/performance"]
         }
 
         # 实体提取规则
@@ -121,6 +135,11 @@ class RouterAgent(WorkerAgent):
         
         # 检查依赖Agent状态
         await self._check_agent_health()
+        
+        # 启动缓存清理任务
+        cache_manager = get_cache_manager()
+        await cache_manager.start_cleanup_task()
+        logger.info("缓存管理器已启动")
 
     async def on_direct(self, message):
         """处理直接消息 - OpenAgents标准接口"""
@@ -205,6 +224,7 @@ class RouterAgent(WorkerAgent):
                 }
             )
 
+    @track_performance("router.smart_process", labels={"agent": "router", "method": "smart_process"})
     async def smart_process(self, user_input: str, context: QueryContext) -> Dict[str, Any]:
         """
         智能处理用户查询 - 核心路由逻辑
@@ -223,6 +243,16 @@ class RouterAgent(WorkerAgent):
 
         try:
             logger.info(f"智能处理查询: {user_input}")
+            
+            # 尝试从缓存获取结果
+            cache_manager = get_cache_manager()
+            cached_result = cache_manager.query_cache.get(user_input, context.__dict__)
+            if cached_result:
+                logger.info(f"使用缓存结果: {user_input[:50]}")
+                processing_time = (datetime.now() - start_time).total_seconds()
+                cached_result["processing_time"] = processing_time
+                cached_result["from_cache"] = True
+                return cached_result
 
             # 1. 智能意图识别
             intent_result = await self._smart_intent_detection(user_input)
@@ -255,6 +285,9 @@ class RouterAgent(WorkerAgent):
             # 4. 结果聚合
             final_result = await self._aggregate_results(task_results, intent, entities)
             agents_used = final_result.get("agents_used", ["router"])
+            
+            # 添加意图信息到结果中，用于响应优化
+            final_result["intent"] = intent
 
             # 5. 响应优化
             enhanced_response = await self._enhance_response(final_result, context)
@@ -270,16 +303,22 @@ class RouterAgent(WorkerAgent):
                 duration=processing_time,
                 success=True
             )
-
-            return {
+            
+            result = {
                 "success": True,
                 "response": enhanced_response,
                 "data": final_result.get("data"),
                 "agent_used": agents_used[0] if agents_used else "router",
                 "processing_time": processing_time,
                 "intent": intent,
-                "confidence": confidence
+                "confidence": confidence,
+                "from_cache": False
             }
+            
+            # 缓存结果（仅缓存成功的结果）
+            cache_manager.query_cache.set(user_input, result, context.__dict__, ttl=300)
+
+            return result
 
         except Exception as e:
             processing_time = (datetime.now() - start_time).total_seconds()
@@ -308,7 +347,8 @@ class RouterAgent(WorkerAgent):
                 "data": None,
                 "agent_used": "router",
                 "processing_time": processing_time,
-                "error": str(e)
+                "error": str(e),
+                "from_cache": False
             }
 
     async def _smart_intent_detection(self, text: str) -> Dict[str, Any]:
@@ -399,6 +439,26 @@ class RouterAgent(WorkerAgent):
     async def _plan_tasks(self, intent: str, entities: Dict, query: str, context: QueryContext) -> List[AgentTask]:
         """任务规划"""
         tasks = []
+        
+        # 处理快捷命令
+        if intent == "命令":
+            tasks.append(AgentTask(
+                agent_name="router",
+                task_type="handle_command",
+                parameters={"command": query},
+                priority=1
+            ))
+            return tasks
+        
+        # 处理帮助请求
+        if intent == "帮助":
+            tasks.append(AgentTask(
+                agent_name="router",
+                task_type="provide_help",
+                parameters={"query": query},
+                priority=1
+            ))
+            return tasks
         
         # 根据意图规划任务
         if intent == "直播查询":
@@ -571,9 +631,40 @@ class RouterAgent(WorkerAgent):
         if task.task_type == "get_system_status":
             return await self._get_system_status()
         elif task.task_type == "generate_greeting":
-            return await self._generate_greeting(task.parameters.get("context", {}))
+            # 安全地获取context参数
+            context_param = task.parameters.get("context", {})
+            if context_param is None:
+                context_param = {}
+            return await self._generate_greeting(context_param)
+        elif task.task_type == "handle_command":
+            return self._handle_command(task.parameters.get("command", ""))
+        elif task.task_type == "provide_help":
+            return self._provide_help(task.parameters.get("query", ""))
         else:
             raise Exception(f"未知的Router任务: {task.task_type}")
+    
+    def _handle_command(self, command: str) -> str:
+        """处理快捷命令"""
+        result = self.studio_helper.handle_command(command)
+        if result:
+            return result
+        return "未知命令。输入 '/help' 查看可用命令。"
+    
+    def _provide_help(self, query: str) -> str:
+        """提供帮助信息"""
+        # 尝试识别帮助主题
+        query_lower = query.lower()
+        
+        if "直播" in query_lower or "查询" in query_lower:
+            return self.studio_helper.get_help_message("直播查询")
+        elif "简报" in query_lower or "新闻" in query_lower:
+            return self.studio_helper.get_help_message("简报生成")
+        elif "系统" in query_lower or "状态" in query_lower:
+            return self.studio_helper.get_help_message("系统功能")
+        elif "命令" in query_lower:
+            return self.studio_helper.get_quick_commands_list()
+        else:
+            return self.studio_helper.get_help_message()
 
     async def _aggregate_results(self, results: List[TaskResult], intent: str, entities: Dict) -> Dict[str, Any]:
         """聚合任务结果"""
@@ -626,24 +717,16 @@ class RouterAgent(WorkerAgent):
         if entities.get("主播名"):
             # 单个主播查询
             if live_data.get("is_live"):
-                message = self._format_live_status(live_data)
+                message = self.formatter.format_live_status(live_data)
             else:
                 player_name = entities["主播名"]
-                message = f"📺 {player_name} 当前未在直播\n💡 你可以查询其他主播或生成游戏简报"
+                message = self.formatter.format_offline_status(player_name)
         else:
             # 多个主播状态
             if isinstance(live_data, list) and live_data:
-                message = "🔴 当前直播中的主播：\n\n"
-                for i, stream in enumerate(live_data[:5], 1):
-                    user_name = stream.get("user_name", "未知")
-                    game_name = stream.get("game_name", "")
-                    viewers = stream.get("viewer_count", 0)
-                    message += f"{i}. {user_name}"
-                    if game_name:
-                        message += f" - {game_name}"
-                    message += f" ({viewers:,}观众)\n"
+                message = self.formatter.format_live_list(live_data)
             else:
-                message = "📺 当前没有主播在直播"
+                message = self.formatter.format_offline_status("主播")
         
         return {
             "success": True,
@@ -664,14 +747,17 @@ class RouterAgent(WorkerAgent):
                 live_players = result.data
         
         # 组合简报内容
+        live_count = len(live_players) if isinstance(live_players, list) else 0
+        
         if briefing_data:
-            message = briefing_data
+            message = self.formatter.format_briefing(briefing_data, live_count)
         elif live_players:
             # 基于直播数据生成简单简报
-            live_count = len(live_players) if isinstance(live_players, list) else 0
-            message = f"📰 【小游探简报】\n\n🔥 当前直播: {live_count}位主播在线\n📊 系统运行正常，数据更新及时"
+            simple_briefing = f"🔥 当前直播: {live_count}位主播在线\n📊 系统运行正常，数据更新及时"
+            message = self.formatter.format_briefing(simple_briefing, live_count)
         else:
-            message = "📰 【小游探简报】\n\n🔥 系统运行正常，数据更新及时\n💡 更多详情请查询具体主播状态"
+            simple_briefing = "🔥 系统运行正常，数据更新及时\n💡 更多详情请查询具体主播状态"
+            message = self.formatter.format_briefing(simple_briefing, 0)
         
         return {
             "success": True,
@@ -686,7 +772,7 @@ class RouterAgent(WorkerAgent):
         
         return {
             "success": True,
-            "message": self._format_system_status(status_data),
+            "message": self.formatter.format_system_status(status_data),
             "data": status_data,
             "agents_used": ["router"]
         }
@@ -703,33 +789,23 @@ class RouterAgent(WorkerAgent):
         }
 
     def _format_live_status(self, status: Dict) -> str:
-        """格式化直播状态"""
-        user_name = status.get("user_name") or status.get("player_name", "未知")
-        platform = status.get("platform", "未知平台")
-        title = status.get("title", "无标题")
-        viewers = status.get("viewer_count", 0)
-        game_name = status.get("game_name", "")
-
-        response = f"🔴 {user_name} 正在 {platform} 直播！\n"
-        response += f"📝 标题：{title}\n"
-        if game_name:
-            response += f"🎮 游戏：{game_name}\n"
-        response += f"👥 观众：{viewers:,}\n"
-
-        if status.get("live_url"):
-            response += f"🔗 直播间：{status['live_url']}"
-
-        return response
+        """格式化直播状态（已弃用，使用formatter.format_live_status）"""
+        # 保持向后兼容
+        return self.formatter.format_live_status(status)
 
     async def _enhance_response(self, result: Dict[str, Any], context: QueryContext) -> str:
         """响应优化"""
         base_message = result.get("message", "")
+        intent = result.get("intent", "未知")
+        
+        # 添加上下文建议
+        enhanced_message = self.formatter.add_suggestions(base_message, intent)
         
         try:
-            # 使用LLM优化响应
+            # 使用LLM优化响应（可选）
             llm_response = await llm_client.process_with_fallback(
                 "response_enhancement",
-                base_message,
+                enhanced_message,
                 {"context": context.__dict__, "data": result.get("data")}
             )
             
@@ -740,7 +816,7 @@ class RouterAgent(WorkerAgent):
         except Exception as e:
             logger.warning(f"响应优化失败: {e}")
         
-        return base_message
+        return enhanced_message
 
     async def _handle_unknown_intent(self, query: str, context: QueryContext) -> Dict[str, Any]:
         """处理未知意图"""
@@ -754,9 +830,12 @@ class RouterAgent(WorkerAgent):
             if llm_response.success and llm_response.source == "llm":
                 response = f"我理解你可能想要：\n{llm_response.content}\n\n" + self._get_help_message()
             else:
-                response = self._get_default_unknown_response()
+                # 使用Studio助手提供上下文帮助
+                contextual_help = self.studio_helper.get_contextual_help(query, "未知")
+                response = contextual_help if contextual_help else self._get_default_unknown_response()
         except Exception:
-            response = self._get_default_unknown_response()
+            contextual_help = self.studio_helper.get_contextual_help(query, "未知")
+            response = contextual_help if contextual_help else self._get_default_unknown_response()
 
         return {
             "success": False,
@@ -768,13 +847,7 @@ class RouterAgent(WorkerAgent):
 
     def _get_help_message(self) -> str:
         """获取帮助信息"""
-        return """💡 你可以尝试这些查询：
-🔴 "Faker在直播吗？" - 查询主播状态
-📰 "生成今日简报" - 获取游戏圈动态
-📊 "系统状态" - 查看系统运行状态
-👋 "你好" - 打招呼
-
-请告诉我你想了解什么？"""
+        return self.studio_helper.get_help_message("基础使用")
 
     def _get_default_unknown_response(self) -> str:
         """默认未知响应"""
@@ -843,30 +916,33 @@ class RouterAgent(WorkerAgent):
         }
 
     def _format_system_status(self, status: Dict[str, Any]) -> str:
-        """格式化系统状态"""
-        llm_status = status.get("llm_status", {})
-        agents = status.get("agents", {})
-        
-        response = "🖥️ **系统状态报告**\n\n"
-        response += f"🤖 **路由中枢**: {status.get('router_status', 'unknown')}\n"
-        response += f"🧠 **AI引擎**: {llm_status.get('provider', 'unknown')} "
-        response += f"({'🟢 在线' if llm_status.get('available') else '🟡 降级'})\n"
-        response += f"📊 **今日AI调用**: {llm_status.get('daily_usage', '0/0')}\n\n"
-        
-        response += "🔧 **Agent状态**:\n"
-        for agent_name, agent_status in agents.items():
-            status_icon = "🟢" if agent_status["available"] else "🔴"
-            error_count = agent_status["error_count"]
-            response += f"  {status_icon} {agent_name}"
-            if error_count > 0:
-                response += f" (错误: {error_count})"
-            response += "\n"
-        
-        return response
+        """格式化系统状态（已弃用，使用formatter.format_system_status）"""
+        # 保持向后兼容
+        return self.formatter.format_system_status(status)
 
     async def _generate_greeting(self, context: Dict) -> str:
         """生成问候语"""
-        # 获取系统状态
+        # 安全地检查是否是首次访问
+        if context is None:
+            context = {}
+        
+        # 确保context是字典
+        if not isinstance(context, dict):
+            logger.warning(f"Context is not a dict: {type(context)}, converting to empty dict")
+            context = {}
+        
+        # 安全地获取metadata
+        metadata = context.get("metadata") if context else {}
+        if metadata is None:
+            metadata = {}
+        
+        is_first_visit = metadata.get("first_visit", True) if isinstance(metadata, dict) else True
+        
+        if is_first_visit:
+            # 首次访问，显示完整欢迎消息
+            return self.studio_helper.get_welcome_message()
+        
+        # 非首次访问，显示简短问候
         system_status = await self._get_system_status()
         llm_stats = llm_client.get_usage_stats()
         
@@ -884,7 +960,10 @@ class RouterAgent(WorkerAgent):
 - 今日AI调用: {llm_stats['daily_calls']}/{llm_stats['daily_limit']}
 - 注册Agent: {len(self.agents)}个
 
-💡 请问有什么可以帮助你的？"""
+💡 请问有什么可以帮助你的？
+
+_输入 "帮助" 或 "/demo" 查看更多功能_
+"""
 
         return greeting
 
@@ -905,6 +984,14 @@ class RouterAgent(WorkerAgent):
     async def on_shutdown(self):
         """Agent关闭"""
         logger.info(f"🛑 {self.agent_id} 关闭")
+        
+        # 停止缓存清理任务
+        cache_manager = get_cache_manager()
+        cache_manager.stop_cleanup_task()
+        
+        # 打印缓存统计
+        cache_stats = cache_manager.get_all_stats()
+        logger.info(f"缓存统计: {json.dumps(cache_stats, indent=2, ensure_ascii=False)}")
 
 
 # 测试代码

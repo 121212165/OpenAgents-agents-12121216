@@ -23,9 +23,11 @@ def setup_environment():
     sys.path.insert(0, str(ROOT_DIR))
     os.environ.setdefault("PYTHONPATH", str(ROOT_DIR))
     
-    # 设置默认环境变量
-    os.environ.setdefault("OPENAGENTS_HOST", "0.0.0.0")
-    os.environ.setdefault("OPENAGENTS_PORT", "8000")
+    # Zeabur会自动设置PORT环境变量，不需要手动设置
+    # 只在本地测试时设置默认值
+    if not os.getenv("PORT"):
+        logger.info("未检测到PORT环境变量，设置默认值8000（本地测试模式）")
+        os.environ.setdefault("PORT", "8000")
     
     # 设置LLM配置（如果没有设置）
     if not os.getenv("OPENAI_API_KEY"):
