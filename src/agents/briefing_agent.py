@@ -45,7 +45,7 @@ class BriefingAgent(WorkerAgent):
     4. 实时数据整合
     """
 
-    def __init__(self):
+    def __init__(self, live_monitor=None, data_source=None, router=None):
         super().__init__(agent_id="briefing-agent")
 
         self.description = "多Agent协作智能简报生成系统"
@@ -96,6 +96,16 @@ class BriefingAgent(WorkerAgent):
         self.llm_enhancement_enabled = True
 
         logger.info(f"{self.agent_id} 初始化成功 - 多Agent协作系统就绪")
+
+        try:
+            if live_monitor is not None:
+                self.register_collaborating_agent("live_monitor", live_monitor)
+            if data_source is not None:
+                self.register_collaborating_agent("data_source", data_source)
+            if router is not None:
+                self.register_collaborating_agent("router", router)
+        except Exception as _:
+            pass
 
     def register_collaborating_agent(self, agent_name: str, agent_instance):
         """注册协作Agent"""

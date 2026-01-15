@@ -222,7 +222,7 @@ MVP版本专注于OpenAgents框架集成和比赛展示，确保系统稳定运�
     - 添加链接和媒体内容
     - _Requirements: 4.3_
 
-  - [ ]* 9.3 验证响应格式
+  - [x] 9.3 验证响应格式
     - **Property 6: Response Format Richness**
     - **Validates: Requirements 4.3**
 
@@ -231,8 +231,8 @@ MVP版本专注于OpenAgents框架集成和比赛展示，确保系统稳定运�
     - 测试公开访问
     - 实现分享功能
     - _Requirements: 1.4_
-
-  - [ ] 9.5 创建演示场景
+d
+  - [-] 9.5 创建演示场景
     - 设计完整演示流程
     - 准备多个测试用例
     - 录制演示视频

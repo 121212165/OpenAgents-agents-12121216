@@ -13,6 +13,10 @@ import asyncio
 import time
 from typing import List, Dict, Any
 from datetime import datetime
+import sys
+from pathlib import Path
+ROOT_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT_DIR))
 
 # 导入系统组件
 from src.agents.router_agent import RouterAgent, QueryContext

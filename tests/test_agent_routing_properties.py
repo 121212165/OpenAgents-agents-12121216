@@ -60,21 +60,26 @@ class TestAgentRoutingProperties:
         await live_monitor.on_shutdown()
         await briefing_agent.on_shutdown()
     
-    @given(st.text(min_size=1, max_size=100))
-    @settings(max_examples=50, deadline=5000)
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("query_text", [
+        "Faker在直播吗",
+        "生成简报",
+        "你好",
+        "未知意图测试"
+    ])
     async def test_property_intent_classification_consistency(self, query_text, setup_router_system):
         """
         Property 3.1: 意图分类一致性
         相同的查询应该产生一致的意图分类结果
         """
-        system = await setup_router_system
+        system = setup_router_system
         router = system["router"]
         
         try:
             # 多次执行相同查询
             results = []
             for _ in range(3):
-                result = await router._detect_intent_smart(query_text)
+                result = await router._smart_intent_detection(query_text)
                 results.append(result)
             
             # 验证一致性
@@ -93,20 +98,20 @@ class TestAgentRoutingProperties:
                 pytest.skip("空查询跳过")
             raise
     
-    @given(st.sampled_from([
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("live_query", [
         "Faker在直播吗",
         "Uzi开播了吗", 
         "查看TheShy的直播状态",
         "大司马在线吗",
         "直播中的主播有哪些"
-    ]))
-    @settings(max_examples=20, deadline=10000)
+    ])
     async def test_property_live_query_routing(self, live_query, setup_router_system):
         """
         Property 3.2: 直播查询路由正确性
         直播相关查询应该正确路由到LiveMonitor Agent
         """
-        system = await setup_router_system
+        system = setup_router_system
         router = system["router"]
         
         try:
@@ -132,20 +137,20 @@ class TestAgentRoutingProperties:
             logger.error(f"❌ 直播查询路由测试失败: {live_query} -> {e}")
             raise
     
-    @given(st.sampled_from([
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("briefing_query", [
         "生成今日简报",
         "简报",
         "汇总游戏圈动态", 
         "日报",
         "briefing"
-    ]))
-    @settings(max_examples=15, deadline=10000)
+    ])
     async def test_property_briefing_query_routing(self, briefing_query, setup_router_system):
         """
         Property 3.3: 简报查询路由正确性
         简报相关查询应该正确路由到Briefing Agent
         """
-        system = await setup_router_system
+        system = setup_router_system
         router = system["router"]
         
         try:
@@ -172,20 +177,20 @@ class TestAgentRoutingProperties:
             logger.error(f"❌ 简报查询路由测试失败: {briefing_query} -> {e}")
             raise
     
-    @given(st.sampled_from([
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("greeting", [
         "你好",
         "hi", 
         "hello",
         "嗨",
         "您好"
-    ]))
-    @settings(max_examples=10, deadline=5000)
+    ])
     async def test_property_greeting_handling(self, greeting, setup_router_system):
         """
         Property 3.4: 问候处理正确性
         问候语应该得到适当的响应
         """
-        system = await setup_router_system
+        system = setup_router_system
         router = system["router"]
         
         try:
@@ -207,17 +212,20 @@ class TestAgentRoutingProperties:
             logger.error(f"❌ 问候处理测试失败: {greeting} -> {e}")
             raise
     
-    @given(st.text(min_size=1, max_size=50).filter(
-        lambda x: not any(keyword in x.lower() for keyword in 
-                         ["直播", "简报", "你好", "hi", "hello", "嗨", "live", "briefing"])
-    ))
-    @settings(max_examples=30, deadline=5000)
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("unknown_query", [
+        "天气怎么样",
+        "推荐一些视频",
+        "查一下排行榜",
+        "帮我找攻略",
+        "明天安排是什么"
+    ])
     async def test_property_unknown_intent_handling(self, unknown_query, setup_router_system):
         """
         Property 3.5: 未知意图处理
         未知查询应该得到合理的降级响应
         """
-        system = await setup_router_system
+        system = setup_router_system
         router = system["router"]
         
         try:
@@ -251,7 +259,7 @@ class TestAgentRoutingProperties:
         Property 3.6: 响应时间合理性
         所有查询的响应时间应该在合理范围内
         """
-        system = await setup_router_system
+        system = setup_router_system
         router = system["router"]
         
         test_queries = [

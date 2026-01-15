@@ -44,6 +44,14 @@ class MockDataGenerator:
         self.stream_titles = self._create_stream_titles()
         self.viewer_fluctuation = {}  # 观众数波动记录
         
+        # 导入演示模式管理器
+        try:
+            from src.utils.demo_mode import get_demo_manager
+            self.demo_manager = get_demo_manager()
+        except ImportError:
+            logger.warning("无法导入演示模式管理器，使用默认配置")
+            self.demo_manager = None
+        
         logger.info(f"模拟数据生成器初始化: {len(self.streamers)} 主播, {len(self.games)} 游戏")
     
     def _create_streamers(self) -> List[MockStreamer]:
@@ -242,45 +250,88 @@ class MockDataGenerator:
         
         return max(final_viewers, 100)  # 最少100观众
     
+    def is_streamer_online(self, streamer: MockStreamer) -> bool:
+        """
+        根据时间和随机因素判断主播是否在线
+        模拟真实的主播在线规律
+        """
+        hour = datetime.now().hour
+        
+        # 黄金时段(19-23点)在线概率80%
+        if 19 <= hour <= 23:
+            online_probability = 0.8
+        # 下午(14-18点)在线概率60%
+        elif 14 <= hour <= 18:
+            online_probability = 0.6
+        # 深夜(0-6点)在线概率20%
+        elif 0 <= hour <= 6:
+            online_probability = 0.2
+        # 其他时间在线概率40%
+        else:
+            online_probability = 0.4
+        
+        # 知名主播(粉丝多)更容易在线
+        if streamer.follower_count > 5000000:
+            online_probability += 0.1
+        
+        return random.random() < online_probability
+    
     def generate_live_streams(self, count: int = 10, 
                             specific_streamers: List[str] = None,
-                            specific_games: List[str] = None) -> List[Dict[str, Any]]:
-        """生成直播流数据"""
-        streams = []
+                            specific_games: List[str] = None,
+                            force_online: bool = False) -> List[Dict[str, Any]]:
+        """
+        生成直播流数据
         
-        # 如果指定了特定主播，优先生成他们的数据
+        Args:
+            count: 需要的直播数量
+            specific_streamers: 指定主播列表
+            specific_games: 指定游戏列表
+            force_online: 强制所有主播在线(演示模式)
+        """
+        streams = []
+        checked_streamers = []
+        
+        # 如果指定了特定主播，优先检查他们
         if specific_streamers:
             for streamer_login in specific_streamers:
                 streamer = next((s for s in self.streamers if s.user_login == streamer_login), None)
                 if streamer:
-                    game = self.get_random_game()
-                    if specific_games:
-                        game_obj = next((g for g in self.games if g.name in specific_games), game)
-                        game = game_obj if game_obj else game
+                    checked_streamers.append(streamer)
                     
-                    stream = self._create_stream_data(streamer, game)
-                    streams.append(stream)
+                    # 检查是否在线
+                    if force_online or self.is_streamer_online(streamer):
+                        game = self.get_random_game()
+                        if specific_games:
+                            game_obj = next((g for g in self.games if g.name in specific_games), game)
+                            game = game_obj if game_obj else game
+                        
+                        stream = self._create_stream_data(streamer, game)
+                        streams.append(stream)
         
         # 生成剩余的随机直播流
         remaining_count = max(0, count - len(streams))
-        for _ in range(remaining_count):
-            streamer = self.get_random_streamer()
+        available_streamers = [s for s in self.streamers if s not in checked_streamers]
+        random.shuffle(available_streamers)
+        
+        for streamer in available_streamers:
+            if len(streams) >= count:
+                break
             
-            # 避免重复
-            if any(s["user_login"] == streamer.user_login for s in streams):
-                continue
-            
-            game = self.get_random_game()
-            if specific_games:
-                game_obj = next((g for g in self.games if g.name in specific_games), game)
-                game = game_obj if game_obj else game
-            
-            stream = self._create_stream_data(streamer, game)
-            streams.append(stream)
+            # 检查是否在线
+            if force_online or self.is_streamer_online(streamer):
+                game = self.get_random_game()
+                if specific_games:
+                    game_obj = next((g for g in self.games if g.name in specific_games), game)
+                    game = game_obj if game_obj else game
+                
+                stream = self._create_stream_data(streamer, game)
+                streams.append(stream)
         
         # 按观众数排序
         streams.sort(key=lambda x: x["viewer_count"], reverse=True)
         
+        logger.info(f"生成直播流: {len(streams)}/{count} (force_online={force_online})")
         return streams[:count]
     
     def _create_stream_data(self, streamer: MockStreamer, game: MockGame) -> Dict[str, Any]:

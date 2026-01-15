@@ -61,8 +61,14 @@ class ResponseFormatter:
             "cache": "💾"
         }
     
-    def format_live_status(self, status: Dict[str, Any]) -> str:
-        """格式化直播状态"""
+    def format_live_status(self, status: Dict[str, Any], data_source: str = "unknown") -> str:
+        """
+        格式化直播状态
+        
+        Args:
+            status: 直播状态数据
+            data_source: 数据来源 (twitch_api, mock, cache等)
+        """
         user_name = status.get("user_name") or status.get("player_name", "未知")
         platform = status.get("platform", "未知平台")
         title = status.get("title", "无标题")
@@ -85,6 +91,9 @@ class ResponseFormatter:
         # 添加链接
         if live_url:
             response += f"\n{self.emoji_map['link']} [**点击观看直播**]({live_url})\n"
+        
+        # 添加数据来源标识
+        response += self._format_data_source_label(data_source)
         
         # 添加建议
         response += f"\n---\n"
@@ -134,8 +143,15 @@ class ResponseFormatter:
         
         return response
     
-    def format_briefing(self, briefing_data: str, live_count: int = 0) -> str:
-        """格式化简报"""
+    def format_briefing(self, briefing_data: str, live_count: int = 0, data_sources: List[str] = None) -> str:
+        """
+        格式化简报
+        
+        Args:
+            briefing_data: 简报内容
+            live_count: 在线主播数量
+            data_sources: 数据来源列表
+        """
         response = f"## {self.emoji_map['news']} 小游探游戏圈简报\n\n"
         response += f"{self.emoji_map['time']} _{datetime.now().strftime('%Y年%m月%d日 %H:%M')}_\n\n"
         response += "---\n\n"
@@ -148,6 +164,10 @@ class ResponseFormatter:
             response += f"\n\n---\n"
             response += f"### {self.emoji_map['report']} 实时统计\n\n"
             response += f"{self.emoji_map['live']} **当前直播**: {live_count} 位主播在线\n"
+        
+        # 添加数据来源标识
+        if data_sources:
+            response += self._format_data_source_label(data_sources[0] if len(data_sources) == 1 else "mixed")
         
         # 添加建议
         response += f"\n{self.emoji_map['help']} _想了解具体主播？试试查询 \"Faker在直播吗？\"_\n"
@@ -313,6 +333,29 @@ class ResponseFormatter:
         if hours > 0:
             return f"{hours}小时{minutes}分"
         return f"{minutes}分钟"
+    
+    def _format_data_source_label(self, data_source: str) -> str:
+        """
+        格式化数据来源标识
+        
+        Args:
+            data_source: 数据来源 (twitch_api, mock, cache, mixed等)
+        
+        Returns:
+            格式化的数据来源标签
+        """
+        if data_source == "mock":
+            return f"\n\n{self.emoji_map['info']} _数据来源: 演示模式 (模拟数据)_"
+        elif data_source == "twitch_api":
+            return f"\n\n{self.emoji_map['success']} _数据来源: Twitch API (实时数据)_"
+        elif data_source == "cache":
+            return f"\n\n{self.emoji_map['cache']} _数据来源: 缓存 (最近更新)_"
+        elif data_source == "mixed":
+            return f"\n\n{self.emoji_map['info']} _数据来源: 混合模式 (多数据源)_"
+        elif data_source == "unknown":
+            return ""
+        else:
+            return f"\n\n{self.emoji_map['info']} _数据来源: {data_source}_"
 
 
 # 全局响应格式化器
