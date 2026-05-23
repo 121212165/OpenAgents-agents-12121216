@@ -1,196 +1,55 @@
-# 🎮 小游探（YouGame Explorer）
+# OpenAgents-agents-12121216
 
-> 为游戏圈粉丝打造的 AI 吃瓜助手
-
-[![OpenAgents](https://img.shields.io/badge/OpenAgents-compatible-brightgreen)](https://openagents.org)
-[![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-## 📖 项目简介
-
-小游探是一个基于 OpenAgents 的多 Agent 协作网络，专注于游戏圈实时信息追踪和分析。当前版本支持：
-
-- 🎯 **实时直播监控**：追踪虎牙平台游戏主播开播状态
-- 🤖 **智能问答系统**：自然语言查询游戏圈动态
-- 📊 **自动简报生成**：智能汇总重要事件
-
-## 🏆 比赛信息
-
-本项目参加OpenAgents技术赛道，展示多Agent协作的创新应用：
-
-- **技术实现**：基于OpenAgents框架的多Agent协作网络
-- **协作创新**：智能路由、数据聚合、实时监控的Agent协作场景
-- **应用价值**：解决游戏圈信息追踪的实际问题
-- **展示效果**：完整的演示场景和技术文档
-
-### 技术亮点
-- 🤖 **多Agent协作**：Router、DataSource、Briefing、Monitor四个Agent协同工作
-- 🔄 **智能路由**：基于意图识别的任务分发机制
-- 🛡️ **故障切换**：多数据源自动切换，确保服务稳定性
-- ⚡ **实时响应**：3秒内响应用户查询
-- 🐳 **一键部署**：Docker容器化，支持快速部署
-
-## 🚀 快速开始
-
-### 环境要求
-
-- Python 3.10+
-- OpenAgents SDK
-- Claude API Key 或其他 LLM API
-
-### 安装
-
-```bash
-# 1. 克隆项目
-git clone https://github.com/your-username/yougame-explorer.git
-cd yougame-explorer
-
-# 2. 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 3. 安装依赖
-pip install -r requirements.txt
-
-# 4. 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，填入你的 API Keys
-
-# 5. 启动网络
-python src/main.py
-```
-
-### 使用
-
-#### 方式一：Studio 界面（推荐）
-
-1. 访问 [OpenAgents Studio](https://openagents.org/studio)
-2. 连接到你的本地网络
-3. 开始对话！
-
-#### 方式二：命令行
-
-```python
-# 示例代码
-from src.agents.router_agent import RouterAgent
-
-router = RouterAgent()
-result = await router.process("Uzi 今天直播了吗？")
-print(result)
-```
-
-## 🤖 Agent 架构
-
-```
-┌─────────────────────────────────┐
-│    小游探 Agent Network          │
-└─────────────────────────────────┘
-              │
-    ┌─────────┴─────────┐
-    │  Router Agent     │  🧠 大脑
-    └─────────┬─────────┘
-              │
-      ┌───────┼───────┐
-      │       │       │
-      ▼       ▼       ▼
-┌─────────┐ ┌──────┐ ┌──────┐
-│Monitor  │ │Analyzer│ │Briefing│
-│Agent    │ │Agent  │ │Agent  │
-└─────────┘ └──────┘ └──────┘
-```
-
-### Agent 列表
-
-| Agent | 功能 | 状态 |
-|-------|------|------|
-| Router Agent | 任务分发、用户意图识别 | ✅ 完成 |
-| LiveMonitor Agent | 虎牙直播状态监控 | ✅ 完成 |
-| BriefingAgent | 简报生成、消息推送 | ✅ 完成 |
-
-## 📝 使用示例
-
-### 查询直播状态
-
-```
-用户：Uzi 直播了吗？
-小游探：🔴 是的！Uzi 正在虎牙直播
-- 直播间：Uzi的直播间
-- 人气：200万+
-- 已开播：2小时30分
-```
-
-### 生成简报
-
-```
-用户：生成今日游戏圈简报
-小游探：📰 【小游探日报】2025年1月10日
-🔥 今日热点：
-1. Uzi 凌晨3点偷偷开播
-2. Faker 训练赛亮眼表现
-...
-```
-
-## 🔧 配置说明
-
-### 追踪的主播列表
-
-编辑 `config/players.yaml`：
-
-```yaml
-monitored_players:
-  - name: "Uzi"
-    huya_id: "123456"
-    team: "RNG"
-  - name: "Faker"
-    huya_id: "789012"
-    team: "T1"
-```
-
-## 🛠️ 技术栈
-
-- **框架**：OpenAgents SDK
-- **语言**：Python 3.10+
-- **LLM**：Claude 3.5 Sonnet / GPT-4
-- **异步**：AsyncIO + aiohttp
-- **数据源**：虎牙直播 API
-
-## 📈 开发路线图
-
-### MVP版本（当前）🎯
-专注于OpenAgents集成和比赛展示：
-- [x] Router Agent（OpenAgents标准）
-- [x] LiveMonitor Agent（稳定数据源）
-- [x] BriefingAgent（多Agent协作）
-- [x] 基础问答功能
-- [ ] Twitch API集成
-- [ ] 完整的演示场景
-- [ ] Docker部署支持
-
-### Phase 2：进阶版（计划中）
-- [ ] SocialMedia Agent（微博、抖音）
-- [ ] SentimentAgent（情绪分析）
-- [ ] TimelineAgent（事件脉络）
-- [ ] 多平台支持（斗鱼、B站）
-
-### Phase 3：完整版（未来）
-- [ ] DeepDiveAgent（深度报道）
-- [ ] 主动推送功能
-- [ ] 用户个性化推荐
-- [ ] 可视化界面
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可证
-
-MIT License
-
-## 🙏 致谢
-
-- [OpenAgents](https://openagents.org) - 优秀的多 Agent 框架
-- 游戏圈社区 - 提供灵感和反馈
+OpenAgents比赛的一个项目
 
 ---
 
-**小游探 - 让追星，更智能！** 🎮✨
+## 30 秒了解这个项目
+
+| 维度 | 内容 |
+|------|------|
+| 项目类型 | AI/Agent 项目 |
+| 技术栈 | Python 3.11+ |
+| 核心功能 | OpenAgents比赛的一个项目 |
+| 适用场景 | 个人学习、原型验证、工具辅助 |
+
+---
+
+## 30-Second Project Overview
+
+| Dimension | Content |
+|------|------|
+| Project Type | AI/Agent Project |
+| Tech Stack | Python 3.11+ |
+| Core Function | OpenAgents比赛的一个项目 |
+| Use Cases | Learning, prototyping, tool assistance |
+
+---
+
+## 快速开始
+
+```bash
+# Python
+pip install -r requirements.txt && python app.py
+
+# Node.js
+npm install && npm start
+```
+
+---
+
+## 项目结构
+```
+├── src/          # 源代码
+├── tests/        # 测试
+└── README.md     # 项目说明
+```
+
+---
+
+## 许可证
+MIT License
+
+---
+*最后更新: 2026-05-23*
+*作者: 121212165*
