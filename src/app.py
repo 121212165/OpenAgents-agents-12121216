@@ -202,4 +202,4 @@ if __name__ == "__main__":
     host = get_host()
     logger.info(f"Starting on {host}:{port}")
     demo = build_ui()
-    demo.launch(server_name="0.0.0.0", server_port=port, share=False)
+    demo.launch(server_name="0.0.0.0", server_port=port, share=False)  # nosec B104

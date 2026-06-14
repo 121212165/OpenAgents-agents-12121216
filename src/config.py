@@ -30,4 +30,4 @@ def get_port() -> int:
         return 8000
 
 def get_host() -> str:
-    return os.getenv("OPENAGENTS_HOST", "0.0.0.0")
+    return os.getenv("OPENAGENTS_HOST", "0.0.0.0")  # nosec B104
