@@ -1,55 +1,46 @@
-# OpenAgents-agents-12121216
+# 小游探 — YouGame Explorer
 
-OpenAgents比赛的一个项目
+Gaming stream assistant. Check if streamers are live, get briefings, see trends.
 
----
-
-## 30 秒了解这个项目
-
-| 维度 | 内容 |
-|------|------|
-| 项目类型 | AI/Agent 项目 |
-| 技术栈 | Python 3.11+ |
-| 核心功能 | OpenAgents比赛的一个项目 |
-| 适用场景 | 个人学习、原型验证、工具辅助 |
-
----
-
-## 30-Second Project Overview
-
-| Dimension | Content |
-|------|------|
-| Project Type | AI/Agent Project |
-| Tech Stack | Python 3.11+ |
-| Core Function | OpenAgents比赛的一个项目 |
-| Use Cases | Learning, prototyping, tool assistance |
-
----
-
-## 快速开始
+## Quick Start
 
 ```bash
-# Python
-pip install -r requirements.txt && python app.py
-
-# Node.js
-npm install && npm start
+pip install -r requirements.txt
+python src/app.py
 ```
 
----
+Open http://localhost:7860
 
-## 项目结构
+## Docker
+
+```bash
+docker compose up --build
 ```
-├── src/          # 源代码
-├── tests/        # 测试
-└── README.md     # 项目说明
+
+## Project Structure
+
+```
+src/
+  app.py      # Web UI + intent routing (~120 lines)
+  data.py     # Mock streamer data (~90 lines)
+  config.py   # Config loader (~30 lines)
+config/
+  players.yaml
 ```
 
----
+## What Changed
 
-## 许可证
-MIT License
+This is a first-principles reconstruction. The original ~19,000-line codebase (4-agent architecture, LLM intent classification, 3 cache layers, Prometheus metrics, resource optimizer) was rebuilt in ~310 lines.
 
----
-*最后更新: 2026-05-23*
-*作者: 121212165*
+The entire product logic — intent detection, live status queries, briefing generation, trending topics — works the same. The infrastructure overhead was removed.
+
+## Environment
+
+```
+PORT=7860                    # Server port
+OPENAGENTS_HOST=0.0.0.0     # Server host
+```
+
+## License
+
+MIT
